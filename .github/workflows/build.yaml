@@ -1,0 +1,71 @@
+name: Build
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      AUTOBUILD: autobuild
+      AUTOBUILD_ADDRSIZE: '64'
+      AUTOBUILD_BUILD_ID: ${{ github.run_id }}
+      AUTOBUILD_VARIABLES_FILE: ${{ github.workspace }}/.build-variables/variables
+      AUTOBUILD_VSVER: '170'
+      MSYS2_ARG_CONV_EXCL: '*'
+      MSYS2_ROOT: 'C:\msys64'
+    steps:
+      # FFmpeg's configure is a POSIX shell script: a CRLF checkout breaks it.
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/checkout@v7
+        with:
+          repository: secondlife/build-variables
+          path: .build-variables
+      - uses: actions/setup-python@v7
+        with:
+          # 3.14 provides compression.zstd for verify_package.py.
+          python-version: '3.14'
+      - name: Dependencies
+        run: |
+          python -m pip install autobuild==3.9.3
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            sudo apt-get update
+            sudo apt-get install -y nasm
+          fi
+      - name: MSYS2 build tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -Sy --noconfirm --needed make nasm diffutils"
+      - name: Build
+        run: autobuild build -A 64 -c Release --no-configure --id "$GITHUB_RUN_ID"
+      - name: Package
+        run: |
+          platform=linux64
+          if [[ "$RUNNER_OS" == Windows ]]; then platform=windows64; fi
+          version="$(cat stage/VERSION.txt)"
+          autobuild package -A 64 --archive-format tzst --archive-name "ffmpeg-${version}-${platform}-${GITHUB_RUN_ID}" --results-file autobuild-results.json
+      - name: Verify package (layout, licence, exports, HE-AAC/Opus decoding)
+        run: python -I verify_package.py ffmpeg-*.tar.zst
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ffmpeg-${{ runner.os }}-64
+          path: |
+            *.tar.zst
+            autobuild-results.json
+            stage/SOURCE_REVISION.txt
+            stage/CONFIGURATION.txt
+          if-no-files-found: error
