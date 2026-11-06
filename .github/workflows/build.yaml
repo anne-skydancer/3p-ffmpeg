@@ -54,20 +54,79 @@ jobs:
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -Sy --noconfirm --needed make nasm diffutils"
       - name: Build
         run: autobuild build -A 64 -c Release --no-configure --id "$GITHUB_RUN_ID"
+      - name: Report glibc requirement (Linux, report only)
+        if: runner.os == 'Linux'
+        run: python .github/scripts/glibc_report.py --json glibc.json stage
+      - name: Write build-info file
+        run: |
+          FLAVOUR=linux64
+          if [[ "$RUNNER_OS" == Windows ]]; then FLAVOUR=windows64; fi
+          python .github/scripts/buildinfo.py --name ffmpeg --flavour "$FLAVOUR"             --upstream-version 9.0.2 --upstream-source https://github.com/FFmpeg/FFmpeg.git             --upstream-hash "$(cat stage/SOURCE_REVISION.txt)"             --build-type "Release, decoder-only LGPL shared libraries (AAC/HE-AAC and Opus decoders)"             --glibc-json glibc.json --option "$(cat stage/CONFIGURATION.txt)"
       - name: Package
         run: |
           platform=linux64
           if [[ "$RUNNER_OS" == Windows ]]; then platform=windows64; fi
           version="$(cat stage/VERSION.txt)"
           autobuild package -A 64 --archive-format tzst --archive-name "ffmpeg-${version}-${platform}-${GITHUB_RUN_ID}" --results-file autobuild-results.json
-      - name: Report glibc requirement (Linux, report only)
-        if: runner.os == 'Linux'
-        run: python .github/scripts/glibc_report.py stage
       - name: Verify package (layout, licence, exports, HE-AAC/Opus decoding)
         run: python -I verify_package.py ffmpeg-*.tar.zst --max-glibc 2.39
       - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-${{ runner.os }}-64
+          path: |
+            *.tar.zst
+            autobuild-results.json
+            stage/SOURCE_REVISION.txt
+            stage/CONFIGURATION.txt
+          if-no-files-found: error
+  build-lts:
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
+    env:
+      AUTOBUILD: autobuild
+      AUTOBUILD_ADDRSIZE: '64'
+      AUTOBUILD_BUILD_ID: ${{ github.run_id }}
+      AUTOBUILD_VARIABLES_FILE: ${{ github.workspace }}/.build-variables/variables
+      MSYS2_ARG_CONV_EXCL: '*'
+      FLAVOUR: linux64-lts
+    steps:
+      - name: Install build tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends             ca-certificates git build-essential make nasm binutils python3 python3-venv
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/checkout@v7
+        with:
+          repository: secondlife/build-variables
+          path: .build-variables
+      - name: Install packaging tools
+        run: |
+          python3 -m venv /opt/ab
+          /opt/ab/bin/pip install autobuild==3.9.3 zstandard
+          echo /opt/ab/bin >> "$GITHUB_PATH"
+      - name: Build
+        run: autobuild build -A 64 -c Release --no-configure --id "$GITHUB_RUN_ID"
+      - name: Check glibc requirement (fails above 2.39)
+        run: python .github/scripts/glibc_report.py --max 2.39 --json glibc.json stage
+      - name: Write build-info file
+        run: |
+          python .github/scripts/buildinfo.py --name ffmpeg --flavour "$FLAVOUR"             --upstream-version 9.0.2 --upstream-source https://github.com/FFmpeg/FFmpeg.git             --upstream-hash "$(cat stage/SOURCE_REVISION.txt)"             --build-type "Release, decoder-only LGPL shared libraries (AAC/HE-AAC and Opus decoders)"             --glibc-json glibc.json --option "$(cat stage/CONFIGURATION.txt)"
+      - name: Package
+        run: |
+          version="$(cat stage/VERSION.txt)"
+          autobuild package -A 64 --archive-format tzst --archive-name "ffmpeg-${version}-linux64-lts-${GITHUB_RUN_ID}" --results-file autobuild-results.json
+      - name: Verify package (layout, licence, exports, HE-AAC/Opus decoding)
+        run: python -I verify_package.py ffmpeg-*.tar.zst --max-glibc 2.39
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ffmpeg-Linux-LTS-64
           path: |
             *.tar.zst
             autobuild-results.json

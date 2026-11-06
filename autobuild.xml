@@ -42,6 +42,7 @@
           <key>manifest</key>
           <array>
             <string>LICENSES/ffmpeg.txt</string>
+            <string>LICENSES/ffmpeg-buildinfo.json</string>
             <string>SOURCE_REVISION.txt</string>
             <string>CONFIGURATION.txt</string>
             <string>include/libavcodec/*.h</string>
