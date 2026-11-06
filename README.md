@@ -104,10 +104,10 @@ Requirements:
 - **Windows:** Visual Studio 2022 C++ tools (`AUTOBUILD_VSVER=170`) and MSYS2 with
   `make nasm diffutils`. MSYS2 is expected at `C:\msys64`; set `MSYS2_ROOT` for another
   location. `build-cmd.sh` runs under Git Bash, as autobuild starts it.
-- **Linux:** GCC, make and nasm. Build on Ubuntu 22.04 (glibc 2.35) or in an equivalent
-  chroot. A newer build host raises the glibc symbol versions the libraries require; for
+- **Linux:** GCC, make and nasm. CI builds on `ubuntu-latest` (Ubuntu 24.04, glibc 2.39, GCC 13).
+  A newer build host raises the glibc symbol versions the libraries require; for
   example, Ubuntu 26.04 produces `atan2f@GLIBC_2.43`. `verify_package.py` rejects anything
-  newer than GLIBC 2.35 by default.
+  newer than GLIBC 2.35 by default; the workflow passes `--max-glibc 2.39`.
 
 Clone with submodules on Windows without CRLF conversion, because FFmpeg's `configure`
 must keep LF line endings:
@@ -156,6 +156,6 @@ at -6 dBFS. The right channel lies above the SBR crossover. They were generated 
 14.7, libfdk-aac v3.0.0 `aac-enc` (`-t 5 -r 48000` and `-t 29 -r 32000`), and opus-tools
 0.2 with libopus 1.6.1 (`opusenc --bitrate 64 --comp 10`).
 
-The GitHub workflow builds both platforms on `windows-2022` and `ubuntu-22.04` with
+The GitHub workflow builds both platforms on `windows-2022` and `ubuntu-latest` with
 autobuild 3.9.3, then verifies and uploads the `.tar.zst` archives. Those archives become
 the GitHub release assets.
