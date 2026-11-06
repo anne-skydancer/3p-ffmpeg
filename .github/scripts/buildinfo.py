@@ -53,8 +53,8 @@ if linux:
             k, v = l.strip().split('=', 1); osr[k] = v.strip('"')
     in_container = a.flavour.endswith('lts')
     info['build_os'] = osr.get('PRETTY_NAME', '')
-    info['build_environment'] = ('ubuntu:24.04 container on ubuntu-latest runner' if in_container
-                                 else 'ubuntu-latest = %s (image %s)' % (osr.get('PRETTY_NAME', ''), e('ImageVersion', 'unknown')))
+    info['build_environment'] = ('ubuntu:24.04 container (%s) on runner image %s %s' % (osr.get('PRETTY_NAME', ''), e('ImageOS', 'host'), e('ImageVersion', '')) if in_container
+                                 else 'runner ubuntu-26.04 = %s (image %s %s)' % (osr.get('PRETTY_NAME', ''), e('ImageOS', 'unknown'), e('ImageVersion', 'unknown')))
     info['build_glibc'] = (run('ldd', '--version').splitlines() or [''])[0]
     info['compiler'] = (run('gcc', '--version').splitlines() or [''])[0]
     g = '(not measured)'
