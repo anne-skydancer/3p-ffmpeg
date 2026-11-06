@@ -116,6 +116,9 @@ if limit:
     out.append('Limit %s: %s' % (args.max, 'FAIL - ' + '; '.join(bad) if bad else 'ok'))
 text = '\n'.join(out)
 print(text)
+if args.json:
+    import json
+    json.dump({'newest_glibc': vs(overall)}, open(args.json, 'w'))
 if os.environ.get('GITHUB_STEP_SUMMARY'):
     with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as fh:
         fh.write(text + '\n')
